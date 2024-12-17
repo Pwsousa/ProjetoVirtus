@@ -67,6 +67,15 @@ uint16_t size;
 uint8_t Data[256];
 
 
+#define TRIG_PIN GPIO_PIN_6
+#define TRIG_PORT GPIOA
+#define ECHO_PIN GPIO_PIN_7
+#define ECHO_PORT GPIOA
+uint32_t pMillis;
+uint32_t Value1 = 0;
+uint32_t Value2 = 0;
+uint16_t Distance  = 0;  // cm
+char strCopy[15];
 
 /* USER CODE END PV */
 
@@ -118,6 +127,12 @@ int main(void)
   /* USER CODE BEGIN 2 */
   SSD1306_Init (); // Inicializa o display
 
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
+  HAL_Delay(100);
+
+//  HAL_TIM_Base_Start(&htim1);
+  HAL_TIM_Base_Start(&htim1);
+  HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_RESET);
 
   bmp280_init_default_params(&bmp280.params);
     bmp280.addr = BMP280_I2C_ADDRESS_0;
@@ -133,15 +148,32 @@ int main(void)
     while (1)
     {
 
-  	HAL_Delay(100);
+  	//HAL_Delay(1000);
+  	HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_SET);  // pull the TRIG pin HIGH
+	__HAL_TIM_SET_COUNTER(&htim1, 0);
+	while (__HAL_TIM_GET_COUNTER (&htim1) < 10);  // wait for 10 us
+	HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_RESET);  // pull the TRIG pin low
+
+	pMillis = HAL_GetTick(); // used this to avoid infinite while loop  (for timeout)
+	// wait for the echo pin to go high
+	while (!(HAL_GPIO_ReadPin (ECHO_PORT, ECHO_PIN)) && pMillis + 10 >  HAL_GetTick());
+	Value1 = __HAL_TIM_GET_COUNTER (&htim1);
+
+	pMillis = HAL_GetTick(); // used this to avoid infinite while loop (for timeout)
+	// wait for the echo pin to go low
+	while ((HAL_GPIO_ReadPin (ECHO_PORT, ECHO_PIN)) && pMillis + 50 > HAL_GetTick());
+	Value2 = __HAL_TIM_GET_COUNTER (&htim1);
+
+	Distance = (Value2-Value1)* 0.034/2;
   	while (!bmp280_read_float(&bmp280, &temperature, &pressure, &humidity)) {
   		HAL_Delay(2000);
   	}
 
   HAL_Delay(2000);
+  sprintf(strCopy,"Distancia: %d cm", Distance);
 
   char temperature_msg[64];
-  sprintf(temperature_msg, "Temperatura: %f",  temperature);
+  sprintf(temperature_msg, "Temperatura: %f ºC",  temperature);
   char pressure_msg[64];
   sprintf(pressure_msg, "Pressao: %f",  pressure);
 
@@ -151,11 +183,11 @@ int main(void)
   SSD1306_GotoXY(2, 16);
   SSD1306_Puts(pressure_msg, &Font_7x10, 1);
   SSD1306_GotoXY(2, 26); // Defina a posição inicial
-  SSD1306_Puts(standard_msg_led, &Font_7x10, 1); // Escreva a mensagem
+  SSD1306_Puts(strCopy, &Font_7x10, 1); // Escreva a mensagem
   SSD1306_GotoXY(2, 36); // Defina a posição inicial
   SSD1306_Puts(standard_msg_led, &Font_7x10, 1); // Escreva a mensagem
   SSD1306_GotoXY(2, 46); // Defina a posição inicial
-SSD1306_Puts(standard_msg_led, &Font_7x10, 1); // Escreva a mensagem
+  SSD1306_Puts(standard_msg_led, &Font_7x10, 1); // Escreva a mensagem
   SSD1306_UpdateScreen(); // Atualize o display
 
 
@@ -312,7 +344,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_7|GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_6|GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
@@ -331,15 +363,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD2_Pin PA7 PA8 */
-  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_7|GPIO_PIN_8;
+  /*Configure GPIO pins : LD2_Pin PA6 PA8 */
+  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_6|GPIO_PIN_8;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PA6 */
-  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  /*Configure GPIO pin : PA7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -357,7 +389,6 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 /* USER CODE END 0 */
-
 
 
 /* USER CODE END 4 */
