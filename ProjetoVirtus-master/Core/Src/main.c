@@ -22,6 +22,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include"ssd1306.h"
+#include "bmp280.h"
+#include <stdio.h>
+#include <string.h>ex
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,6 +45,8 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+TIM_HandleTypeDef htim1;
+
 /* USER CODE BEGIN PV */
 char address_msg[64];
 char cont_msg[64];
@@ -51,12 +56,25 @@ char standard_msg_led [] = "Standard(100kHz):";
 char fast_msg_led [] = "Fast(400kHz):";
 uint8_t i = 0, retorno;
 uint8_t cont = 0;
+
+
+
+BMP280_HandleTypedef bmp280;
+
+float pressure, temperature, humidity;
+
+uint16_t size;
+uint8_t Data[256];
+
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -96,14 +114,42 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   SSD1306_Init (); // Inicializa o display
 
+
+  bmp280_init_default_params(&bmp280.params);
+    bmp280.addr = BMP280_I2C_ADDRESS_0;
+    bmp280.i2c = &hi2c1;
+
+    while (!bmp280_init(&bmp280, &bmp280.params)) {
+    }
+    	bool bme280p = bmp280.id == BME280_CHIP_ID;
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+    while (1)
+    {
+
+  	HAL_Delay(100);
+  	while (!bmp280_read_float(&bmp280, &temperature, &pressure, &humidity)) {
+  		HAL_Delay(2000);
+  	}
+
+  HAL_Delay(2000);
+
+  char temperature_msg[64];
+  sprintf(temperature_msg, "Temperatura: %f",  temperature);
+  char pressure_msg[64];
+  sprintf(pressure_msg, "Pressao: %f",  pressure);
+
   SSD1306_Clear(); //Seta todos os pixels do buffer para branco
   SSD1306_GotoXY(2,0); //Posiciona o "cursor" no pixel correspondente
-  SSD1306_Puts(standard_msg_led, &Font_7x10, 1); // Escreva a mensagem
+  SSD1306_Puts(temperature_msg, &Font_7x10, 1); // Escreva a mensagem
   SSD1306_GotoXY(2, 16);
-  SSD1306_Puts(standard_msg_led, &Font_7x10, 1);
+  SSD1306_Puts(pressure_msg, &Font_7x10, 1);
   SSD1306_GotoXY(2, 26); // Defina a posição inicial
   SSD1306_Puts(standard_msg_led, &Font_7x10, 1); // Escreva a mensagem
   SSD1306_GotoXY(2, 36); // Defina a posição inicial
@@ -111,12 +157,8 @@ int main(void)
   SSD1306_GotoXY(2, 46); // Defina a posição inicial
 SSD1306_Puts(standard_msg_led, &Font_7x10, 1); // Escreva a mensagem
   SSD1306_UpdateScreen(); // Atualize o display
-  /* USER CODE END 2 */
 
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+
 
     /* USER CODE END WHILE */
 
@@ -207,6 +249,52 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 84-1;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 65535;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -224,7 +312,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_7|GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
@@ -243,11 +331,17 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD2_Pin PA8 */
-  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_8;
+  /*Configure GPIO pins : LD2_Pin PA7 PA8 */
+  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_7|GPIO_PIN_8;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB0 */
@@ -262,6 +356,9 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+/* USER CODE END 0 */
+
+
 
 /* USER CODE END 4 */
 

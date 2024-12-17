@@ -24,6 +24,7 @@ C_DEPS :=
 SUBDIRS := \
 Core/Src \
 Core/Startup \
+Drivers/BMP280/Src \
 Drivers/SSD1306_drive/Src \
 Drivers/STM32F4xx_HAL_Driver/Src \
 

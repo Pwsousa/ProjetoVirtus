@@ -11,6 +11,7 @@ RM := rm -rf
 -include sources.mk
 -include Drivers/STM32F4xx_HAL_Driver/Src/subdir.mk
 -include Drivers/SSD1306_drive/Src/subdir.mk
+-include Drivers/BMP280/Src/subdir.mk
 -include Core/Startup/subdir.mk
 -include Core/Src/subdir.mk
 -include objects.mk
@@ -62,7 +63,7 @@ main-build: projeto.elf secondary-outputs
 
 # Tool invocations
 projeto.elf projeto.map: $(OBJS) $(USER_OBJS) C:\Users\Isac\Downloads\ProjetoVirtus-master\ProjetoVirtus-master\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "projeto.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Isac\Downloads\ProjetoVirtus-master\ProjetoVirtus-master\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="projeto.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "projeto.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Isac\Downloads\ProjetoVirtus-master\ProjetoVirtus-master\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="projeto.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -u _scanf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
